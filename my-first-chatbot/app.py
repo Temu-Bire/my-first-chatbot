@@ -1,88 +1,76 @@
+# app.py
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))  # Add current directory to path
 import streamlit as st
-from groq import Groq
-from typing import Any, List, Dict, cast
+from src.chatbot import chat
+from src.memory import init_memory, clear_memory, get_memory
+from src.prompt_lab import run_multiple
 
-# ----------------- CONFIG -----------------
-st.set_page_config(page_title="My Amharic Chatbot", page_icon="🇪🇹")
-st.title("🤖 My First LLM Chatbot")
-st.caption("Powered by Llama 3 on Groq • Made by you!")
+st.set_page_config(page_title="AI App", layout="wide")
 
-# ----------------- CONFIG -----------------
-MODEL_NAME = "llama-3.3-70b-versatile"
-MAX_HISTORY = 10
+st.title("🤖 AI Chatbot + Prompt Playground")
 
-# ----------------- API KEY -----------------
-if "groq_key" not in st.session_state:
-    key = st.text_input("Paste your Groq API key:", type="password")
-    if key:
-        st.session_state.groq_key = key
-        st.success("Key saved!")
-        st.rerun()
-    st.stop()
+# Initialize memory
+init_memory()
 
-# Initialize client
-client = Groq(api_key=st.session_state.groq_key)
+# Sidebar
+mode = st.sidebar.selectbox("Select Mode", ["Chatbot", "Prompt Playground"])
 
-# ----------------- MEMORY -----------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if mode == "Chatbot":
+    st.subheader("💬 Chatbot")
 
-# ----------------- SIDEBAR -----------------
-language_mode = st.sidebar.radio(
-    "Chat in:",
-    ["English + Amharic", "Only Amharic"]
-)
+    user_input = st.text_input("Type your message")
 
-# ----------------- SYSTEM PROMPT -----------------
-def get_system_prompt(mode: str) -> str:
-    if mode == "Only Amharic":
-        return "Respond only in Amharic. Be clear and helpful."
-    return "Respond in both English and Amharic clearly."
+    col1, col2 = st.columns(2)
 
-system_prompt = get_system_prompt(language_mode)
+    with col1:
+        if st.button("Send"):
+            if user_input:
+                response = chat(user_input)
 
-# ----------------- DISPLAY CHAT -----------------
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    with col2:
+        if st.button("Clear Chat"):
+            clear_memory()
 
-# ----------------- CHAT INPUT -----------------
-if prompt := st.chat_input("እንዴት ነህ? Ask me anything..."):
+    # Display chat
+    messages = get_memory()
 
-    # Save user message
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    for msg in messages[1:]:  # skip system message
+        if msg["role"] == "user":
+            st.markdown(f"**🧑 You:** {msg['content']}")
+        else:
+            st.markdown(f"**🤖 Bot:** {msg['content']}")
 
-    # Show user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
+elif mode == "Prompt Playground":
+    st.subheader("🧪 Prompt Engineering Playground")
 
-    # Limit memory (important for performance)
-    st.session_state.messages = st.session_state.messages[-MAX_HISTORY:]
+    input_text = st.text_area("Input Text")
 
-    # Prepare API messages
-    api_messages: List[Dict[str, str]] = [
-        {"role": "system", "content": system_prompt}
-    ] + st.session_state.messages
+    col1, col2, col3 = st.columns(3)
 
-    # ----------------- AI RESPONSE -----------------
-    with st.chat_message("assistant"):
-        with st.spinner("እያሰብኩ ነው... Thinking..."):
-            try:
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=cast(Any, api_messages),
-                    temperature=0.7,
-                    max_tokens=1024
-                )
+    with col1:
+        prompt1 = st.text_area("Prompt 1")
+    with col2:
+        prompt2 = st.text_area("Prompt 2")
+    with col3:
+        prompt3 = st.text_area("Prompt 3")
 
-                answer = response.choices[0].message.content
+    if st.button("Run Prompts"):
+        outputs = run_multiple([prompt1, prompt2, prompt3], input_text)
 
-            except Exception as e:
-                answer = f"⚠️ Error: {str(e)}"
+        st.write("### Results")
 
-        st.markdown(answer)
+        col1, col2, col3 = st.columns(3)
 
-    # Save assistant response
-    st.session_state.messages.append(
-        {"role": "assistant", "content": answer}
-    )
+        with col1:
+            st.write("Output 1")
+            st.write(outputs[0])
+
+        with col2:
+            st.write("Output 2")
+            st.write(outputs[1])
+
+        with col3:
+            st.write("Output 3")
+            st.write(outputs[2])

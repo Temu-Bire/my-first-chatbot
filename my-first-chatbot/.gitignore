@@ -1,0 +1,20 @@
+# 🐍 Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 📦 Virtual Environment
+venv/
+.env/
+.venv/
+
+# 🔐 Environment variables (IMPORTANT)
+.env
+
+# 🧪 Streamlit
+.streamlit/
+
+# 📊 Logs & temp files
+*.log
+
+
